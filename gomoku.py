@@ -44,7 +44,6 @@ class App:
                                   WIDTH])
                 pygame.display.update()
         
-        
         self._running = True
 
  
@@ -57,24 +56,18 @@ class App:
             
             c = pos[0] // (20+5)
             r = pos[1] // (20+5)
-
-            can_append = False
-            if c < 14 and self.grid[c+1][r]==1: can_append = True
-            if c > 0 and self.grid[c-1][r]==1: can_append = True
-            if r < 14 and self.grid[c][r+1]==1: can_append = True
-            if r > 0 and self.grid[c][r-1]==1: can_append = True
             
             global PLAYER
             
-            if self.grid[c][r] == 0 and can_append:
+            if self.grid[c][r] == 0:
                 self.grid[c][r] = 1
                 
                 if PLAYER:
                     color = WHITE
-                    PLAYER = False
+                    self.grid[c][r] = 1
                 else:
                     color = BLACK
-                    PLAYER = True
+                    self.grid[c][r] = 2
                     
                 pygame.draw.rect(self._display_surf, color,
                                  [(MARGIN + HEIGHT) * c + MARGIN,
@@ -82,7 +75,9 @@ class App:
                                   HEIGHT,
                                   WIDTH])
                 pygame.display.update()
+                self.check_win([c, r], PLAYER)
 
+                PLAYER = not PLAYER
             
     def on_loop(self):
         pass
@@ -106,6 +101,13 @@ class App:
             self.on_loop()
             self.on_render()
         self.on_cleanup()
+
+    def check_win(self, currentPosition, player):
+        print 'OKIDOKI BOYYYY'
+        # checko horizontal
+        # check vertical
+        # check side /
+        # check other side \
  
 if __name__ == "__main__" :
     theApp = App()
