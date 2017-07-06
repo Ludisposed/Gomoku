@@ -75,8 +75,11 @@ class App:
                                   HEIGHT,
                                   WIDTH])
                 pygame.display.update()
-                if self.check_win(PLAYER):
+                #if self.check_win(PLAYER):
+                #    print "1 win" if PLAYER else "2 win"
+                if self.check_win([c,r],PLAYER):
                     print "1 win" if PLAYER else "2 win"
+                    # game over
 
                 PLAYER = not PLAYER
             
@@ -102,31 +105,26 @@ class App:
             self.on_loop()
             self.on_render()
         self.on_cleanup()
-
-    def check_win(self, player):
+    
+    def check_win(self,position,player):
         print 'OKIDOKI BOYYYY'
-        # check in directions: horizontal vertical side / side \
-        directions = [[0,1],[1,0],[-1,1],[1,1]]
-        for direction in directions:
-            if self.check_win_in_direction(direction,player):
-                return True
-        return False
-        
-    def check_win_in_direction(self,direction,player):
         target = 1 if player else 2
-        for i in range(15):
+        if self.grid[position[0]][position[1]] != target:
+            return False
+        directions = [([0,1] , [0,-1]) , ([1,0] , [-1,0]) , ([-1,1] , [1,-1]) , ([1,1] , [-1,-1])]
+        for direction in directions:
             continue_chess = 0
-            k = [0,i] if direction == [1,0] else [i,0]
-            while 0 <= k[0] < 15 and 0 <= k[1] < 15:  
-                if self.grid[k[0]][k[1]] == target:
-                    continue_chess += 1
-                    if continue_chess == 5:
-                        return True
-                else:
-                    continue_chess = 0
-                k[0] += direction[0]
-                k[1] += direction[1]
-                
+            for i in range(2):
+                p = position[:]
+                while 0 <= p[0] < 15 and 0 <= p[1] < 15:
+                    if self.grid[p[0]][p[1]] == target:
+                        continue_chess += 1
+                    else:
+                        break
+                    p[0] += direction[i][0]
+                    p[1] += direction[i][1]
+            if continue_chess >= 6:
+                return True
         return False
 
 if __name__ == "__main__" :
