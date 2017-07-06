@@ -6,6 +6,7 @@ BLACK  = (0, 0, 0)
 WHITE  = (255, 255, 255)
 RED    = (255, 0, 0)
 YELLOW = (255, 222, 173)
+GREEN  = (0, 255, 0)
 
 PLAYER = False
 
@@ -24,6 +25,7 @@ class App:
  
     def on_init(self):
         pygame.init()
+        pygame.font.init()
         self._display_surf = pygame.display.set_mode(self.size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self._display_surf.fill(RED) 
         pygame.display.set_caption('Gomoku')
@@ -32,11 +34,7 @@ class App:
         # Draw the grid
         for row in range(15):
             for column in range(15):
-                if column == 7 and row == 7:
-                    color = WHITE
-                    self.grid[7][7] = 1
-                else:
-                    color = YELLOW
+                color = YELLOW
                 pygame.draw.rect(self._display_surf, color,
                                  [(MARGIN + HEIGHT) * column + MARGIN,
                                   (MARGIN + WIDTH) * row + MARGIN,
@@ -75,11 +73,17 @@ class App:
                                   HEIGHT,
                                   WIDTH])
                 pygame.display.update()
-                #if self.check_win(PLAYER):
-                #    print "1 win" if PLAYER else "2 win"
+                
                 if self.check_win([c,r],PLAYER):
-                    print "1 win" if PLAYER else "2 win"
-                    # game over
+                    win = "Player 1 win" if PLAYER else "Player 2 win"
+                    myfont = pygame.font.SysFont('Comic Sans MS', 30)
+                    text_surface = myfont.render(win, False, (0, 0, 0))
+                    self._display_surf.blit(text_surface, (0,0))
+
+                    # Incomplete button functionalit for new_game
+                    pygame.draw.rect(self._display_surf, GREEN,(50,150,100,50))
+                    pygame.draw.rect(self._display_surf, RED,(250,150,100,50))
+                    pygame.display.update()
 
                 PLAYER = not PLAYER
             
@@ -107,7 +111,6 @@ class App:
         self.on_cleanup()
     
     def check_win(self,position,player):
-        print 'OKIDOKI BOYYYY'
         target = 1 if player else 2
         if self.grid[position[0]][position[1]] != target:
             return False
