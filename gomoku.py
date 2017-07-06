@@ -75,7 +75,8 @@ class App:
                                   HEIGHT,
                                   WIDTH])
                 pygame.display.update()
-                self.check_win([c, r], PLAYER)
+                if self.check_win(PLAYER):
+                    print "1 win" if PLAYER else "2 win"
 
                 PLAYER = not PLAYER
             
@@ -102,13 +103,32 @@ class App:
             self.on_render()
         self.on_cleanup()
 
-    def check_win(self, currentPosition, player):
+    def check_win(self, player):
         print 'OKIDOKI BOYYYY'
-        # checko horizontal
-        # check vertical
-        # check side /
-        # check other side \
- 
+        # check in directions: horizontal vertical side / side \
+        directions = [[0,1],[1,0],[-1,1],[1,1]]
+        for direction in directions:
+            if self.check_win_in_direction(direction,player):
+                return True
+        return False
+        
+    def check_win_in_direction(self,direction,player):
+        target = 1 if player else 2
+        for i in range(15):
+            continue_chess = 0
+            k = [0,i] if direction == [1,0] else [i,0]
+            while 0 <= k[0] < 15 and 0 <= k[1] < 15:  
+                if self.grid[k[0]][k[1]] == target:
+                    continue_chess += 1
+                    if continue_chess == 5:
+                        return True
+                else:
+                    continue_chess = 0
+                k[0] += direction[0]
+                k[1] += direction[1]
+                
+        return False
+
 if __name__ == "__main__" :
     theApp = App()
     theApp.on_execute()
