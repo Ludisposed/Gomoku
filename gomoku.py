@@ -86,7 +86,7 @@ class Gomoku(object):
 
     def start(self):
         self._playing = True
-        self.grid = [[0 for x in range(15)] for y in range(15)]
+        self.grid = [[0 for _ in range(15)] for _ in range(15)]
         self.lastPosition = [-1, -1]
         self._win = False
 
