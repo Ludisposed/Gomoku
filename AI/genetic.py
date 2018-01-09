@@ -58,6 +58,7 @@ class Genetic:
                 for n in [1,14,15,16]:
                     for m in range(2,5):
                         if board[i * 15 + j] !=0 and \
+                           ((i * 15 + j + 4 * n) // 15 == ((i * 15 + j) // 15) + 4 if n > 1 else True) and \
                            i * 15 + j - 1 >= 0 and board[i * 15 + j - 1] == 0 and \
                            i * 15 + j + m * n < 225 and board[i * 15 + j + m * n] == 0 and \
                            len(set([board[i * 15 + j + k * n] for k in range(m)])) == 1:

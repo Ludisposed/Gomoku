@@ -25,9 +25,9 @@ class Gomoku():
             for j in range(15):
                 if board[i * 15 + j] != 0 and i * 15 + j + 4 * 1 < 225 and len(set([board[i * 15 + j + k * 1] for k in range(5)])) == 1:
                     return True, board[i * 15 + j]
-                elif board[i * 15 + j] != 0 and i * 15 + j + 4 * 16 < 225 and len(set([board[i * 15 + j + k * 16] for k in range(5)])) == 1:
+                elif board[i * 15 + j] != 0 and (i * 15 + j + 4 * 16) // 15 == ((i * 15 + j) // 15) + 4 and i * 15 + j + 4 * 16 < 225 and len(set([board[i * 15 + j + k * 16] for k in range(5)])) == 1:
                     return True, board[i * 15 + j]
-                elif board[i * 15 + j] != 0 and i * 15 + j + 4 * 14 < 225 and len(set([board[i * 15 + j + k * 14] for k in range(5)])) == 1:
+                elif board[i * 15 + j] != 0 and (i * 15 + j + 4 * 14) // 15 == ((i * 15 + j) // 15) + 4 and i * 15 + j + 4 * 14 < 225 and len(set([board[i * 15 + j + k * 14] for k in range(5)])) == 1:
                     return True, board[i * 15 + j]
                 elif board[i * 15 + j] != 0 and i * 15 + j + 4 * 15 < 225 and len(set([board[i * 15 + j + k * 15] for k in range(5)])) == 1:
                     return True, board[i * 15 + j]
@@ -66,6 +66,9 @@ class GomukuGeneticAgent(GomukuAgent):
     def next_move(self, game, print_board = False):
         mov = self.model.predict(game)
         game.add_piece(self.get_player(), mov)
+
+        if print_board:
+            print(game)
 
         return mov
 
@@ -129,11 +132,11 @@ def test():
     p1 = GomukuGeneticAgent(1)
     p2 = GomukuGeneticAgent(-1)
 
-    winner = train_play(p1,p2, print_board = True)
+    return train_play(p1,p2, print_board = False)
 
 if __name__ == "__main__":
     train(10000)
-    test()
+    print(test())
 
 
 
