@@ -100,19 +100,6 @@ def train_play(p1,p2,print_board = False):
 
 def train(episodes):
     for e in range(episodes):
-        p1 = GomukuGeneticAgent(1)
-        p2 = GomukuGeneticAgent(-1)
-
-        winner = train_play(p1,p2)
-        p1.replay(winner)
-        p2.replay(winner)
-
-        p1 = GomukuGeneticAgent(1)
-        p2 = GomukuGeneticAgent(-1)
-
-        winner = train_play(p1,p2)
-        p1.replay(winner)
-        p2.replay(winner)
 
         p1 = GomukuGeneticAgent(1)
         p2 = GomukuAgent(-1)
@@ -124,6 +111,13 @@ def train(episodes):
         p2 = GomukuGeneticAgent(-1)
 
         winner = train_play(p1,p2)
+        p2.replay(winner)
+
+        p1 = GomukuGeneticAgent(1)
+        p2 = GomukuGeneticAgent(-1)
+
+        winner = train_play(p1,p2)
+        p1.replay(winner)
         p2.replay(winner)
 
         print("Iternation : {}#".format(e))
