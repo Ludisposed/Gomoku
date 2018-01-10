@@ -25,14 +25,13 @@ class Genome():
 
 #train 10 games test 1 games to get fitness for that genomes
 class Genetic:
-    def __init__(self, player):
+    def __init__(self):
         self.mutation_rate = 0.2
         self.mutation_step = 0.2
 
         self.current_genome = -1
         self.population_size = 10
         self.genomes = []
-        self.player = player
         self.read_dataset()
         self.evaluate_next_genome()
 
@@ -40,37 +39,65 @@ class Genetic:
         self.genomes[self.current_genome].fitness = score
         self.evaluate_next_genome()
 
-    def predict(self, game):
-        valid_choices = game.get_empty_pos()
+    def predict(self, game, player):
+        board = game.get_board()
+        current_moves = self.predict_one_depth(board, player)
+        current_player = player
+        #depth = 6
+        #soooo slow
+        for i in range(5):
+            print("In depth {}#".format(i+1))
+            current_player *= (-1)
+            for move in current_moves:
+                next_board = move[3]
+                next_moves = self.predict_one_depth(next_board, current_player)
+                next_best_move = self.best_choice(next_moves)
+                if current_player == player:
+                    move[1] += next_best_move[1]
+                    move[2] += next_best_move[2]
+                else:
+                    move[2] += next_best_move[1]
+                    move[1] += next_best_move[2]
+                move[3][next_best_move[0]] = current_player
+        return self.best_choice(current_moves)[0]
+
+    def best_choice(self, scores):
+        return max(scores, key = lambda x: 0.5 * x[1] + (-0.5) * x[2])
+
+    def predict_one_depth(self, board, player):
+        valid_choices = [idx for idx in range(len(board)) if board[idx] == 0]
         scores = []
         for pos in valid_choices:
-            board = game.get_board()[:]
-            board[pos]= self.player
-            scores += [[pos, self.score(board)]]
-        return sorted(scores, key = lambda x: -x[1])[0][0]
+            new_board = board[:]
+            new_board[pos] = player
+            scores += [[pos, self.score(new_board, player), self.score(new_board, player * (-1)) ,new_board]]
+        return scores
 
-
-    def score(self, board):
+    def score(self, board, player):
         targets = [0 for _ in range(8)]
 
         for i in range(15):
             for j in range(15):
                 for n in [1,14,15,16]:
-                    for m in range(2,5):
+                    for m in range(2,6):
+
+                        pieces_in_one_line = (i * 15 + j + (m-1) * n) // 15 == ((i * 15 + j) // 15) + ((m-1) if n > 1 else 0)
+
+                        open_line = i * 15 + j - n >= 0 and board[i * 15 + j - n] == 0 and\
+                                    i * 15 + j + m * n < 225 and board[i * 15 + j + m * n] == 0
+
+                        same_piece_in_line = i * 15 + j + (m-1) * n < 225 and len(set([board[i * 15 + j + k * n] for k in range(m)])) == 1
+        
                         if board[i * 15 + j] !=0 and \
-                           ((i * 15 + j + 4 * n) // 15 == ((i * 15 + j) // 15) + 4 if n > 1 else True) and \
-                           i * 15 + j - 1 >= 0 and board[i * 15 + j - 1] == 0 and \
-                           i * 15 + j + m * n < 225 and board[i * 15 + j + m * n] == 0 and \
-                           len(set([board[i * 15 + j + k * n] for k in range(m)])) == 1:
-                            if board[i * 15 + j] == self.player:
+                           pieces_in_one_line and \
+                           (open_line if m < 5 else True) and \
+                           same_piece_in_line:
+                            
+                            if board[i * 15 + j] == player:
                                 targets[(m - 2) * 2] += 1
                             else:
                                 targets[(m - 2) * 2 + 1] += 1
-                    if board[i * 15 + j] !=0 and i * 15 + j + 4 * n < 225 and len(set([board[i * 15 + j + k * n] for k in range(5)])) == 1:
-                        if board[i * 15 + j] == self.player:
-                            targets[6] += 1
-                        else:
-                            targets[7] += 1
+                    
 
 
         return targets[0] * self.genomes[self.current_genome].two_mine_pieces_in_open_row +\
@@ -131,12 +158,12 @@ class Genetic:
         return child
 
     def save_dataset(self):
-        with open('genomes' + str(self.player), 'wb+') as f:
+        with open('genomes', 'wb+') as f:
             pickle.dump((self.genomes, self.current_genome), f, -1)
     def read_dataset(self):
-        if not os.path.isfile('genomes' + str(self.player)):
+        if not os.path.isfile('genomes'):
             self.genomes = [Genome() for _ in range(self.population_size)]
             
         else:
-            with open('genomes' + str(self.player), 'rb') as f:
+            with open('genomes', 'rb') as f:
                 self.genomes, self.current_genome = pickle.load(f)
