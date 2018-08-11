@@ -146,10 +146,10 @@ def Move(request):
         statue, msg = move(content["player"], position)
         if statue == 0:
             return HttpResponse(json.dumps('{{"code":10010, "errmsg":\"{}\"}}'.format(msg)))
-        elif statue == 1:
-            return HttpResponse(json.dumps('{{"code":10010, "content":\"{}\", "finish":False}}'.format(msg)))
+        elif statue == 3:
+            return HttpResponse(json.dumps('{{"code":10010, "content":\"{}\", "finish":False, "winner":-1}}'.format(msg)))
        
-        return HttpResponse(json.dumps('{{"code":10010, "content":\"{}\", "finish":True}}'.format(msg)))
+        return HttpResponse(json.dumps('{{"code":10010, "content":\"{}\", "finish":True, "winner":{}}}'.format(msg, statue)))
     else:
         raise Http404
     

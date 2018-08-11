@@ -87,13 +87,13 @@ def move(username, position):
         Game.objects.filter(id=game.id).update(board=board)
         step = Step.objects.create(board=board)
         Record.objects.create(game=game.id, step=step.id)
-        game_status = game_finish(board)
+        game_status = game_finish(board, current_piece, [position // 15, position % 15])
         if game_status >= 0:
             Game.objects.filter(id=game.id).update(finished=True, result=game_status, end_timestamp=datetime.now())
             User.objects.filter(name=username).update(gaming=False)
             User.objects.filter(name=another_player).update(gaming=False)
-            return 2, board
-        return 1, board
+            return game_status, board
+        return 3, board
     except ObjectDoesNotExist:
         return 0, "User not exist"
 
@@ -116,8 +116,27 @@ def game_user_in(userid):
         return game_player2, 1, game_player2.player1
     return None, -1, -1
 
-def game_finish(board):
-    pass
+def game_finish(board, current_piece, position):
+    if "2" not in board:
+        return 2
+    board = [board[i:i+15] for i in range(0,225,15)]
+    directions = [([0, 1], [0, -1]), ([1, 0], [-1, 0]), ([-1, 1], [1, -1]), ([1, 1], [-1, -1])]
+    for direction in directions:
+        continue_chess = 0
+        for i in range(2):
+            p = position[:]
+            while 0 <= p[0] < 15 and 0 <= p[1] < 15:
+                if board[p[0]][p[1]] == current_piece:
+                    continue_chess += 1
+                else:
+                    break
+                p[0] += direction[i][0]
+                p[1] += direction[i][1]
+        if continue_chess >= 6:
+            return current_piece
+
+    return -1
+        
 
 
 
