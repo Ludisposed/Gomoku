@@ -15,6 +15,8 @@ class User(models.Model):
 class Game(models.Model):
     player1=models.ForeignKey(User, on_delete=models.CASCADE, default=DEFAULT_USER_ID, related_name="fk_g_p1_id")
     player2=models.ForeignKey(User, on_delete=models.CASCADE, default=DEFAULT_USER_ID, related_name="fk_g_p2_id")
+    current_player=models.ForeignKey(User, on_delete=models.CASCADE, default=DEFAULT_USER_ID, related_name="fk_g_c_id")
+    next_player=models.ForeignKey(User, on_delete=models.CASCADE, default=DEFAULT_USER_ID, related_name="fk_g_n_id")
     board=models.CharField(max_length=255, default=DEFAULT_BOARD)
     finished=models.BooleanField(default=False)
     start_timestamp=models.DateField(auto_now=True)
