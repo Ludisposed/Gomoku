@@ -35,7 +35,7 @@ def handle_client(client_socket):
     print(f"[*] Recieved: {request.decode('utf-8')}")
 
     if(request=="new game"):
-        client_socket.send("let's start a new game")
+        client_socket.send(b"let's start a new game")
     # send back a packet
     client_socket.send(b"\n\nOK!")
 
