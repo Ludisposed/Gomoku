@@ -1,5 +1,6 @@
-import socket
-import threading
+# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+import socketserver
 import argparse
 import re
 import sys
@@ -17,7 +18,7 @@ def parse_options():
                                      epilog=
 '''
 Examples:
-python client.py -h '0.0.0.0' -p 9999
+python server.py -i '0.0.0.0' -p 9999
 '''
                                         )
     parser.add_argument('-i','--ip', type=str, default="0.0.0.0", help='server host')
@@ -33,34 +34,27 @@ python client.py -h '0.0.0.0' -p 9999
         print("[-] IPV4 host is not valid")
         sys.exit(1)
     return args
-
-def handle_client(client_socket):
-    # print what client says
-    request = client_socket.recv(1024)
-    print(f"[*] Recieved: {request}")
-
-    client_socket.send(request)
-
-    client_socket.close()
-
+# TODO: sent to target client
+class GomokuTCPHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        while True:
+            try:
+                self.data = self.request.recv(1024).strip()
+                if not self.data:
+                    break
+                print(f"{self.client_address[0]}:{self.client_address[1]} wrote: {self.data}")
+                response = json.dumps({"state":"ok"})
+                self.request.sendall(response.encode("utf-8"))
+            except:
+                break
 
 def main(ip, port):
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((ip, port))
-    server.listen(2)
-    print(f"[*] Listening on {ip}:{port}")
-
-    clients = []
-    while True:
-        try:
-            client, addr = server.accept()
-            print(f"[*] Accepted connection from: {addr[0]}:{addr[1]}")
-            
-            # spin the client thread to handle incoming data
-            client_handler = threading.Thread(target=handle_client, args=(client,))
-            client_handler.start()
-        except KeyboardInterrupt:
-            server.close()
+    server = socketserver.TCPServer((ip, port), GomokuTCPHandler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
+        server.server_close()
 
 if __name__ == "__main__":
     args = parse_options()

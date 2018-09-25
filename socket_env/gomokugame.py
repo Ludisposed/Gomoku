@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import pygame
+from client import GomokuClient
 '''
-1. current player(player1) add piece at place, sent to server in json, For example: {"player":1, "position":{"x":0,"y":0}}
-2. another player(player2) receive from server player1, For example: {"player":1, "position":{"x":0,"y":0}} and update game board
+1. current player(player1) add piece at place, sent to server in json, For example: {"player":1,"x":0,"y":0}
+2. another player(player2) receive from server player1, For example: {"player":1, "x":0,"y":0} and update game board
 '''
 # Define some colors
 BLACK = (0, 0, 0)
@@ -20,6 +21,9 @@ BOARD = (WIDTH + MARGIN) * 14 + MARGIN
 GAME_WIDTH = BOARD + PADDING * 2
 GAME_HIGHT = GAME_WIDTH + 100
 
+SERVER_HOST = "localhost"
+SERVER_PORT = 9999
+
 class Gomoku(object):
     def __init__(self):
         self.grid = [[0 for x in range(15)] for y in range(15)]
@@ -36,6 +40,21 @@ class Gomoku(object):
         self._playing = False
         self._win = False
         self.lastPosition = [-1, -1]
+
+    @property
+    def playing(self):
+        return self._playing
+
+    @attribute.setter
+    def playing(self, val):
+        self._playing = val
+        if val:
+            self.client = GomokuClient(SERVER_HOST, SERVER_PORT)
+        else:
+            if self.client is not None:
+                self.client.close()
+                self.client = None
+    
 
     def on_event(self, event):
         if event.type == pygame.QUIT:
@@ -92,6 +111,7 @@ class Gomoku(object):
         self.grid = [[0 for _ in range(15)] for _ in range(15)]
         self.lastPosition = [-1, -1]
         self._win = False
+        
 
     def surrender(self):
         self._playing = False
