@@ -1,5 +1,9 @@
+# -*- coding: utf-8 -*-
 import pygame
-
+'''
+1. current player(player1) add piece at place, sent to server in json, For example: {"player":1, "position":{"x":0,"y":0}}
+2. another player(player2) receive from server player1, For example: {"player":1, "position":{"x":0,"y":0}} and update game board
+'''
 # Define some colors
 BLACK = (0, 0, 0)
 WHITE = (245, 245, 245)
@@ -15,7 +19,6 @@ DOT = 4
 BOARD = (WIDTH + MARGIN) * 14 + MARGIN
 GAME_WIDTH = BOARD + PADDING * 2
 GAME_HIGHT = GAME_WIDTH + 100
-
 
 class Gomoku(object):
     def __init__(self):
@@ -202,3 +205,4 @@ class Gomoku(object):
 if __name__ == "__main__":
     gomoku = Gomoku()
     gomoku()
+

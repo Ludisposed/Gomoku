@@ -2,6 +2,13 @@ import socket
 import argparse
 import re
 import sys
+import json
+
+'''
+sent current player new position to server
+receive another player's position from server and update client
+
+'''
 
 def parse_options():
     parser = argparse.ArgumentParser(usage='%(prog)s [options]',
@@ -13,7 +20,7 @@ Examples:
 python client.py -h '0.0.0.0' -p 9999
 '''
                                         )
-    parser.add_argument('-o','--host', type=str, default="0.0.0.0", help='server host')
+    parser.add_argument('-o','--host', type=str, default="localhost", help='server host')
     parser.add_argument('-p','--port', type=int, default=9999, help='server port')
     args = parser.parse_args()
 
@@ -37,7 +44,6 @@ def main(host, port):
         client.send(sendstring.encode("utf-8"))
         # Recieve
         response = client.recv(4096)
-        
         print(response.decode("utf-8"))
 
 if __name__ == "__main__":

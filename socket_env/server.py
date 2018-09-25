@@ -3,6 +3,12 @@ import threading
 import argparse
 import re
 import sys
+import json
+
+'''
+version 1: only two players connect to this server
+receive position json data from one client and sent it anther client
+'''
 
 def parse_options():
     parser = argparse.ArgumentParser(usage='%(prog)s [options]',
@@ -31,28 +37,25 @@ python client.py -h '0.0.0.0' -p 9999
 def handle_client(client_socket):
     # print what client says
     request = client_socket.recv(1024)
+    print(f"[*] Recieved: {request}")
 
-    print(f"[*] Recieved: {request.decode('utf-8')}")
-
-    if(request=="new game"):
-        client_socket.send(b"let's start a new game")
-    # send back a packet
-    client_socket.send(b"\n\nOK!")
+    client_socket.send(request)
 
     client_socket.close()
+
 
 def main(ip, port):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((ip, port))
-    server.listen(5)
+    server.listen(2)
     print(f"[*] Listening on {ip}:{port}")
 
+    clients = []
     while True:
         try:
             client, addr = server.accept()
-
             print(f"[*] Accepted connection from: {addr[0]}:{addr[1]}")
-
+            
             # spin the client thread to handle incoming data
             client_handler = threading.Thread(target=handle_client, args=(client,))
             client_handler.start()
