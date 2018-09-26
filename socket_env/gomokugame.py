@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import pygame
-from client import GomokuClient
+import json
 '''
-1. current player(player1) add piece at place, sent to server in json, For example: {"player":1,"x":0,"y":0}
-2. another player(player2) receive from server player1, For example: {"player":1, "x":0,"y":0} and update game board
+player get {"grid":[GRID INFO], "x":X, "y":Y, "player":LAST_PLAYER, "winner":WINNER(-1: game still going/0: draw/1: winner is player1/2: winner is player2)}
 '''
 # Define some colors
 BLACK = (0, 0, 0)
@@ -21,12 +20,9 @@ BOARD = (WIDTH + MARGIN) * 14 + MARGIN
 GAME_WIDTH = BOARD + PADDING * 2
 GAME_HIGHT = GAME_WIDTH + 100
 
-SERVER_HOST = "localhost"
-SERVER_PORT = 9999
 
 class Gomoku(object):
-    def __init__(self):
-        self.grid = [[0 for x in range(15)] for y in range(15)]
+    def __init__(self, clientsocket, player):
         pygame.init()
         pygame.font.init()
         self._display_surf = pygame.display.set_mode(
@@ -35,64 +31,58 @@ class Gomoku(object):
 
         pygame.display.set_caption('Gomoku')
 
-        self.player = False
+        self.clientsocket = clientsocket
+        self.player = player
+        self.last_player = -1
         self._running = True
+        self.winner = False
         self._playing = False
-        self._win = False
         self.lastPosition = [-1, -1]
 
-    @property
-    def playing(self):
-        return self._playing
-
-    @attribute.setter
-    def playing(self, val):
-        self._playing = val
-        if val:
-            self.client = GomokuClient(SERVER_HOST, SERVER_PORT)
-        else:
-            if self.client is not None:
-                self.client.close()
-                self.client = None
+    def update(self, message):
+        self._playing = True
+        self.grid = message["grid"]
+        self.lastPosition = [message["x"], message["y"]]
+        self.last_player = message["player"]
+        if self.last_player == self.player or (self.last_player == -1 and self.player == 2):
+            self._playing = False
+        self.winner = message["winner"]
+        if self.winner >= 0:
+            self._playing = False
     
+    def recieve_data(self):
+        data = self.clientsocket.recv(1024).decode("utf-8")
+        data = json.loads(data)
+        self.update(data)
+
+    def send_data(self, message):
+        self.clientsocket.send(json.dumps(message).encode("utf-8"))
+
+    def close_connection(self):
+        self.clientsocket.close()
 
     def on_event(self, event):
         if event.type == pygame.QUIT:
+            self.close_connection()
             self._running = False
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            # does not update postion in python3.6, and I don't know why
-            pos = pygame.mouse.get_pos()
-            if self.mouse_in_botton(pos):
-                if not self._playing:
-                    self.start()
-                    if self.player:
-                        self.player = not self.player
-                else:
-                    self.surrender()
-                    self.player = not self.player
-
-            elif self._playing:
+        if self._playing:
+            if event.type == pygame.MOUSEBUTTONUP:
+                pos = pygame.mouse.get_pos()
                 r = (pos[0] - PADDING + WIDTH // 2) // (WIDTH + MARGIN)
                 c = (pos[1] - PADDING + WIDTH // 2) // (WIDTH + MARGIN)
-
-                if 0 <= r < 15 and 0 <= c < 15:
-                    if self.grid[r][c] == 0:
-                        self.lastPosition = [r, c]
-                        self.grid[r][c] = 1 if self.player else 2
-
-                        # check win
-                        if self.check_win([r, c], self.player):
-                            self._win = True
-                            self._playing = False
-                        else:
-                            self.player = not self.player
+                if 0 <= r < 15 and 0 <= c < 15 and self.grid[r][c] == 0:
+                    self.grid[r][c] = self.player
+                    data = {"grid":self.grid, "x":r, "y":c, "player":self.player}
+                    self.send_data(data)
+                    self._playing = False
+        else:
+            self.recieve_data()
 
     def on_render(self):
         self.render_gomoku_piece()
         self.render_last_position()
         self.render_game_info()
-        self.render_button()
         pygame.display.update()
 
     def on_cleanup(self):
@@ -104,18 +94,8 @@ class Gomoku(object):
             for event in pygame.event.get():
                 self.on_event(event)
             self.on_render()
+            
         self.on_cleanup()
-
-    def start(self):
-        self._playing = True
-        self.grid = [[0 for _ in range(15)] for _ in range(15)]
-        self.lastPosition = [-1, -1]
-        self._win = False
-        
-
-    def surrender(self):
-        self._playing = False
-        self._win = True
 
     def gomoku_board_init(self):
         self._display_surf.fill(YELLOW)
@@ -145,33 +125,22 @@ class Gomoku(object):
                             DOT,
                             DOT), 0)
 
-    def mouse_in_botton(self, pos):
-        if GAME_WIDTH // 2 - 50 <= pos[0] <= GAME_WIDTH // 2 + 50 and GAME_HIGHT - 50 <= pos[1] <= GAME_HIGHT - 20:
-            return True
-        return False
-
-    def render_button(self):
-        color = GREEN if not self._playing else RED
-        info = "Start" if not self._playing else "Surrender"
-
-        pygame.draw.rect(self._display_surf, color,
-                         (GAME_WIDTH // 2 - 50, GAME_HIGHT - 50, 100, 30))
-
-        info_font = pygame.font.SysFont('Helvetica', 18)
-        text = info_font.render(info, True, WHITE)
-        textRect = text.get_rect()
-        textRect.centerx = GAME_WIDTH // 2
-        textRect.centery = GAME_HIGHT - 35
-        self._display_surf.blit(text, textRect)
-
     def render_game_info(self):
-        # current player color
-        color = BLACK if not self.player else WHITE
+        
+
+        color = BLACK if not self.last_player == 1 else WHITE
         center = (GAME_WIDTH // 2 - 60, BOARD + 60)
         radius = 12
         pygame.draw.circle(self._display_surf, color, center, radius, 0)
 
-        info = "You Win" if self._win else "Your Turn"
+        info = "Your Turn"
+
+        if self.winner > 0:
+            color = WHITE if self.last_player == 1 else BLACK
+            info = "You Win"
+        elif self.winner == 0:
+            info = "Draw"
+            color = YELLOW
         info_font = pygame.font.SysFont('Helvetica', 24)
         text = info_font.render(info, True, BLACK)
         textRect = text.get_rect()
@@ -199,30 +168,5 @@ class Gomoku(object):
                               (MARGIN + WIDTH),
                               (MARGIN + WIDTH)), 1)
 
-    def check_win(self, position, player):
-        target = 1 if player else 2
-        if self.grid[position[0]][position[1]] != target:
-            return False
-        directions = [([0, 1], [0, -1]), ([1, 0], [-1, 0]), ([-1, 1], [1, -1]), ([1, 1], [-1, -1])]
-        for direction in directions:
-            continue_chess = 0
-            for i in range(2):
-                p = position[:]
-                while 0 <= p[0] < 15 and 0 <= p[1] < 15:
-                    if self.grid[p[0]][p[1]] == target:
-                        continue_chess += 1
-                    else:
-                        break
-                    p[0] += direction[i][0]
-                    p[1] += direction[i][1]
-            if continue_chess >= 6:
-                return True
-        return False
-
     def __call__(self):
         self.on_execute()
-
-if __name__ == "__main__":
-    gomoku = Gomoku()
-    gomoku()
-

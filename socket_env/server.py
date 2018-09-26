@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python3
+import socket
+import threading
 import socketserver
 import argparse
 import re
@@ -34,27 +36,56 @@ python server.py -i '0.0.0.0' -p 9999
         print("[-] IPV4 host is not valid")
         sys.exit(1)
     return args
-# TODO: sent to target client
-class GomokuTCPHandler(socketserver.BaseRequestHandler):
+
+
+client_addr = []
+client_socket = []
+
+class GomokuTCPRequestHandler(socketserver.BaseRequestHandler):
+    def setup(self):
+        ip = self.client_address[0].strip()
+        port = self.client_address[1]
+        print(f"{ip}:{port} is connect!")
+        client_addr.append(self.client_address)
+        client_socket.append(self.request)
+
     def handle(self):
-        while True:
-            try:
-                self.data = self.request.recv(1024).strip()
-                if not self.data:
-                    break
-                print(f"{self.client_address[0]}:{self.client_address[1]} wrote: {self.data}")
-                response = json.dumps({"state":"ok"})
-                self.request.sendall(response.encode("utf-8"))
-            except:
-                break
+        self.data = self.request.recv(1024).strip()
+        print(f"{self.client_address[0]}:{self.client_address[1]} wrote: {self.data}")
+        response = json.dumps({"state":"ok"})
+        self.request.sendall(response.encode("utf-8"))
+
+    def finish(self):
+        ip = self.client_address[0].strip()
+        port = self.client_address[1]
+        print(f"{ip}:{port} is disconnect!")
+        client_addr.remove(self.client_address)
+        client_socket.remove(self.request)
+
+class GomokuTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
+
+def client(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((ip, port))
 
 def main(ip, port):
-    server = socketserver.TCPServer((ip, port), GomokuTCPHandler)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        server.shutdown()
-        server.server_close()
+    server = GomokuTCPServer((ip, port), GomokuTCPRequestHandler)
+    host, p = server.server_address
+    print(host, p)
+    server_thread = threading.Thread(target=server.serve_forever)
+    server_thread.daemon = True
+    server_thread.start()
+    print("Server loop running in thread:", server_thread.name)
+
+    client("localhost", p)
+    client("localhost", p)
+
+    for s in client_socket:
+        s.sendall(b"hello")
+
+    server.shutdown()
+    server.server_close()
 
 if __name__ == "__main__":
     args = parse_options()

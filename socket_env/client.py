@@ -47,6 +47,9 @@ def singleton(cls):
 @singleton
 class GomokuClient(object):
     def __init__(self, host, port):
+        self.start(host, port)
+
+    def start(self, host, port):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((host,port))
 
@@ -60,13 +63,17 @@ class GomokuClient(object):
 
     def close(self):
         self.client.close()
+        self.client = None
 
 def main(host, port):
-    client = Client(host, port)
+    client = GomokuClient(host, port)
 
     try:
-        client.send_data(1,0,0)
-        print(client.receive_data())
+        while True:
+            sendata = input("What you wanna send >> ")
+            data = sendata.split(",")
+            client.send_data(data[0],data[1],data[2])
+            print(client.receive_data())
     except KeyboardInterrupt:
         print("Failed")
         client.close_connection()
