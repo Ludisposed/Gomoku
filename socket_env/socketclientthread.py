@@ -2,7 +2,8 @@
 import socket
 import struct
 import threading
-import Queue
+import queue
+import json
 
 class ClientCommand():
     CONNECT, SEND, RECEIVE, CLOSE = range(4)
@@ -17,7 +18,7 @@ class ClientReply():
         self.data = data
 
 class SocketClientThread(threading.Thread):
-    def __init__(self, cmd_q=Queue.Queue(), reply_q=Queue.Queue()):
+    def __init__(self, cmd_q=queue.Queue(), reply_q=queue.Queue()):
         super(SocketClientThread, self).__init__()
         self.cmd_q = cmd_q
         self.reply_q = reply_q
@@ -33,11 +34,12 @@ class SocketClientThread(threading.Thread):
         }
 
     def run(self):
-        try:
-            cmd = self.cmd_q.get(True, 0.1)
-            self.handlers[cmd.type_](cmd)
-        except Queue.Empty as e:
-            continue
+        while self.alive.isSet():
+            try:
+                cmd = self.cmd_q.get(True, 0.1)
+                self.handlers[cmd.type_](cmd)
+            except queue.Empty as e:
+                continue
 
     def join(self, timeout=None):
         self.alive.clear()
@@ -91,3 +93,4 @@ class SocketClientThread(threading.Thread):
 
     def _success_reply(self, data=None):
         return ClientReply(ClientReply.SUCCESS, data)
+

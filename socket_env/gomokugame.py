@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 import pygame
+from pygame.locals import *
 import json
+import queue
+import argparse
+import re
 from socketclientthread import SocketClientThread, ClientCommand, ClientReply
 '''
 player get {"grid":[GRID INFO], "x":X, "y":Y, "player":LAST_PLAYER, "winner":WINNER(-1: game still going/0: draw/1: winner is player1/2: winner is player2)}
@@ -26,6 +30,8 @@ class Gomoku(object):
     def __init__(self, player, server_addr):
         pygame.init()
         pygame.font.init()
+        pygame.time.set_timer(USEREVENT+1, 10000)# every 10 seconds
+        self.grid = [[0 for _ in range(15)] for _ in range(15)]
         self._display_surf = pygame.display.set_mode(
             (GAME_WIDTH, GAME_HIGHT),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
@@ -61,15 +67,14 @@ class Gomoku(object):
         self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
         self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
 
-
     def on_client_reply_timer(self):
         try:
             reply = self.clientsocket.reply_q.get(block=False)
-            if reply.type_ == ClientReply.SUCCESS:
+            if reply.type_ == ClientReply.SUCCESS and reply.data is not None:
                 data = reply.data.decode("utf-8")
                 data = json.loads(data)
                 self.update(data)
-        except Queue.Empty:
+        except queue.Empty:
             pass
 
     def close_connection(self):
@@ -102,7 +107,10 @@ class Gomoku(object):
         pygame.quit()
 
     def on_execute(self):
+        self.on_client_reply_timer()
         while self._running:
+            if pygame.event.get(USEREVENT+1):
+                self.on_client_reply_timer()
             self.gomoku_board_init()
             for event in pygame.event.get():
                 self.on_event(event)
@@ -210,3 +218,5 @@ python gomoku_game.py -i 'localhost' -p 9999 -e 2
 
 if __name__ == "__main__":
     args = parse_options()
+    game = Gomoku(args.player, (args.ip, args.port))
+    game()
