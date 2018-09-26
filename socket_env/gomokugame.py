@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import pygame
 import json
+from socketclientthread import SocketClientThread, ClientCommand, ClientReply
 '''
 player get {"grid":[GRID INFO], "x":X, "y":Y, "player":LAST_PLAYER, "winner":WINNER(-1: game still going/0: draw/1: winner is player1/2: winner is player2)}
 '''
@@ -20,9 +21,9 @@ BOARD = (WIDTH + MARGIN) * 14 + MARGIN
 GAME_WIDTH = BOARD + PADDING * 2
 GAME_HIGHT = GAME_WIDTH + 100
 
-
+# when to update
 class Gomoku(object):
-    def __init__(self, clientsocket, player):
+    def __init__(self, player, server_addr):
         pygame.init()
         pygame.font.init()
         self._display_surf = pygame.display.set_mode(
@@ -31,7 +32,8 @@ class Gomoku(object):
 
         pygame.display.set_caption('Gomoku')
 
-        self.clientsocket = clientsocket
+        self.creat_client(server_addr)
+
         self.player = player
         self.last_player = -1
         self._running = True
@@ -50,16 +52,28 @@ class Gomoku(object):
         if self.winner >= 0:
             self._playing = False
     
-    def recieve_data(self):
-        data = self.clientsocket.recv(1024).decode("utf-8")
-        data = json.loads(data)
-        self.update(data)
+    def creat_client(self, server_addr):
+        self.clientsocket = SocketClientThread()
+        self.clientsocket.start()
+        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.CONNECT, server_addr))
 
-    def send_data(self, message):
-        self.clientsocket.send(json.dumps(message).encode("utf-8"))
+    def send_data(self, data):
+        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
+        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
+
+
+    def on_client_reply_timer(self):
+        try:
+            reply = self.clientsocket.reply_q.get(block=False)
+            if reply.type_ == ClientReply.SUCCESS:
+                data = reply.data.decode("utf-8")
+                data = json.loads(data)
+                self.update(data)
+        except Queue.Empty:
+            pass
 
     def close_connection(self):
-        self.clientsocket.close()
+        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.CLOSE))
 
     def on_event(self, event):
         if event.type == pygame.QUIT:
@@ -76,8 +90,7 @@ class Gomoku(object):
                     data = {"grid":self.grid, "x":r, "y":c, "player":self.player}
                     self.send_data(data)
                     self._playing = False
-        else:
-            self.recieve_data()
+
 
     def on_render(self):
         self.render_gomoku_piece()
@@ -170,3 +183,30 @@ class Gomoku(object):
 
     def __call__(self):
         self.on_execute()
+
+def parse_options():
+    parser = argparse.ArgumentParser(usage='%(prog)s [options]',
+                                     description='Gomoku socket client @Ludisposed & @Qin',
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog=
+'''
+Examples:
+python gomoku_game.py -i 'localhost' -p 9999 -e 2
+'''
+                                        )
+    parser.add_argument('-i','--ip', type=str, default="localhost", help='server host')
+    parser.add_argument('-p','--port', type=int, default=9999, help='server port')
+    parser.add_argument('-e','--player', type=int, default=1, help='player')
+    args = parser.parse_args()
+
+    ip_pattern = "((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:(?<!\.)|\.)){4}"
+    ip = re.match(ip_pattern, args.ip)
+    valid_ip = (ip and ip.group(0) == args.ip)
+
+    if not (args.ip == "localhost" or valid_ip):
+        print("[-] IPV4 host is not valid")
+        sys.exit(1)
+    return args
+
+if __name__ == "__main__":
+    args = parse_options()
