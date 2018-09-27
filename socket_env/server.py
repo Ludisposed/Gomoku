@@ -41,6 +41,7 @@ python server.py -i '0.0.0.0' -p 9999
 client_addr = []
 client_socket = []
 
+# socketserver is good also might can consider websocket
 class GomokuTCPRequestHandler(socketserver.BaseRequestHandler):
     def setup(self):
         ip = self.client_address[0].strip()

@@ -6,9 +6,8 @@ import queue
 import argparse
 import re
 from socketclientthread import SocketClientThread, ClientCommand, ClientReply
-'''
-player get {"grid":[GRID INFO], "x":X, "y":Y, "player":LAST_PLAYER, "winner":WINNER(-1: game still going/0: draw/1: winner is player1/2: winner is player2)}
-'''
+
+# TOOD: need test for primary thread
 # Define some colors
 BLACK = (0, 0, 0)
 WHITE = (245, 245, 245)

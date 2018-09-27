@@ -34,6 +34,7 @@ def waiting_for_connections(serversocket):
         connection.append(conn)
     return connection
 
+# TODO: what if client disconnect now/check client's connection before recv_n_bytes
 def recieve_information(connection):
     player_1_info, player_2_info = None, None
     connection_0_header_data = recv_n_bytes(connection[0], 4)
@@ -81,6 +82,8 @@ def check_win(grid, position, player):
             return True
     return False
 
+# TODO: Keep sending (same) package is stupid
+# ANOTHER PROBLEM, what's the package order is wrong!!! SERIOUS
 def main(ip, port):
     serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     
@@ -95,11 +98,13 @@ def main(ip, port):
         while True:
             connection = waiting_for_connections(serversocket)
             data = json.dumps({"grid":grid, "x":position[0], "y":position[1], "player":player, "winner":winner}).encode("utf-8")
+
             header = struct.pack('<L', len(data))
             connection[0].send(header+data)
             print(f"[*] Send to connection[0]: {header+data}")
             connection[1].send(header+data)
             print(f"[*] Send to connection[1]: {header+data}")
+
 
             player1, player2 = recieve_information(connection)
             if player1 is not None or player2 is not None:

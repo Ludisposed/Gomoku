@@ -18,8 +18,7 @@ def creat_client():
 
 def send_data(clientsocket, data):
     clientsocket.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
-    reply = clientsocket.reply_q.get(True)
-    
+
 def on_client_reply_timer(clientsocket, server_addr, player):
     while True:
         clientsocket.cmd_q.put(ClientCommand(ClientCommand.CONNECT, server_addr))

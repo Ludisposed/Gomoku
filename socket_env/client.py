@@ -6,36 +6,7 @@ import re
 import sys
 import json
 
-'''
-sent current player new position to server
-receive another player's position from server and update client
-
-'''
-
-def parse_options():
-    parser = argparse.ArgumentParser(usage='%(prog)s [options]',
-                                     description='Gomoku socket client @Ludisposed & @Qin',
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog=
-'''
-Examples:
-python client.py -h '0.0.0.0' -p 9999
-'''
-                                        )
-    parser.add_argument('-o','--host', type=str, default="localhost", help='server host')
-    parser.add_argument('-p','--port', type=int, default=9999, help='server port')
-    args = parser.parse_args()
-
-
-    host_pattern = "((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:(?<!\.)|\.)){4}"
-    host = re.match(host_pattern, args.host)
-    valid_host = (host and host.group(0) == args.host)
-
-    if not (args.host == "localhost" or valid_host):
-        print("[-] IPV4 host is not valid")
-        sys.exit(1)
-    return args
-
+#I like this singleton, need it later
 def singleton(cls):
     instances = {}
     def _singleton(*args, **kwags):
