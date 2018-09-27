@@ -34,12 +34,15 @@ class SocketClientThread(threading.Thread):
         }
 
     def run(self):
+
         while self.alive.isSet():
+            print("RUNNING")
             try:
                 cmd = self.cmd_q.get(True, 0.1)
                 self.handlers[cmd.type_](cmd)
             except queue.Empty as e:
                 continue
+            print(self.alive.isSet())
 
     def join(self, timeout=None):
         self.alive.clear()
@@ -61,6 +64,7 @@ class SocketClientThread(threading.Thread):
     def _handle_SEND(self, cmd):
         header = struct.pack('<L', len(cmd.data))
         try:
+            print(f"[*] send data {header+cmd.data}")
             self.socket.sendall(header+cmd.data)
             self.reply_q.put(self._success_reply())
         except IOError as e:

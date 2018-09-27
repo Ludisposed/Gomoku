@@ -14,7 +14,11 @@ def process_positions(data, player1, player2):
 def update(info):
     grid = info["grid"]
     player = info["player"]
-    position = [info["x"], info["y"]]
+    x, y = info["x"], info["y"]
+    position = [x, y]
+
+    if 0 <= x < 15 and 0 <= y < 15 and grid[x][y] == 0:
+        grid[x][y] = player
     if check_win(grid, position, player):
         return grid, position, player, player
     return grid, position, player, -1
@@ -29,13 +33,21 @@ def waiting_for_connections(serversocket):
     return connection
 
 def recieve_information(connection):
+    print("waiting...")
+    print(connection)
+    player_1_info, player_2_info = None, None
     connection_0_header_data = recv_n_bytes(connection[0], 4)
-    connection_0_len = struct.unpack('<L', connection_0_header_data)[0]
-    player_1_info = json.loads(recv_n_bytes(connection[0], connection_0_len).decode("utf-8"))
-    
+    print(f"connection[0] header: {connection_0_header_data}")
+    if len(connection_0_header_data) == 4:
+        connection_0_len = struct.unpack('<L', connection_0_header_data)[0]
+        player_1_info = json.loads(recv_n_bytes(connection[0], connection_0_len).decode("utf-8"))
+        
+
     connection_1_header_data = recv_n_bytes(connection[1], 4)
-    connection_1_len = struct.unpack('<L', connection_1_header_data)[0]
-    player_2_info = json.loads(recv_n_bytes(connection[1], connection_1_len).decode("utf-8"))
+    print(f"connection[1] header: {connection_1_header_data}")
+    if len(connection_1_header_data) == 4:
+        connection_1_len = struct.unpack('<L', connection_1_header_data)[0]
+        player_2_info = json.loads(recv_n_bytes(connection[1], connection_1_len).decode("utf-8"))
 
     return player_1_info, player_2_info
 
@@ -70,25 +82,31 @@ def check_win(grid, position, player):
 
 def main(ip, port):
     serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
     try:
         serversocket.bind((ip, port))
+        print(f"[+] Server start at {ip}:{port}")
         serversocket.listen(2)
         grid = [[0 for _ in range(15)] for _ in range(15)]
         position = [-1,-1]
-        player = -1
+        player = 2
         winner = -1
         while True:
             connection = waiting_for_connections(serversocket)
             data = json.dumps({"grid":grid, "x":position[0], "y":position[1], "player":player, "winner":winner}).encode("utf-8")
             header = struct.pack('<L', len(data))
             connection[0].send(header+data)
+            print(f"[*] Send to connection[0]: {header+data}")
             connection[1].send(header+data)
+            print(f"[*] Send to connection[1]: {header+data}")
 
             player1, player2 = recieve_information(connection)
-            print(player1)
-            print(player2)
+            print(f"[*] Receive From Player1: {player1}")
+            print(f"[*] Receive From Player1: {player2}")
 
-            grid, position, player, winner = process_positions((grid, position, player, winner), player1, player2)
+            if player1 is not None and player2 is not None:
+
+                grid, position, player, winner = process_positions((grid, position, player, winner), player1, player2)
     except KeyboardInterrupt:
         serversocket.close()
 
@@ -99,9 +117,3 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-    
