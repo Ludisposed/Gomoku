@@ -3,11 +3,13 @@ import socket
 import json
 import struct
 
+BOARD_ROW = 5
+BOARD_COLUMN = 5
 
 def process_positions(data, player1, player2):
-    if player1["x"] >= 0:
+    if player1 is not None and player1["x"] >= 0:
         return update(player1)
-    elif player2["x"] >= 0:
+    elif player2 is not None and player2["x"] >= 0:
         return update(player2)
     return data
 
@@ -17,8 +19,10 @@ def update(info):
     x, y = info["x"], info["y"]
     position = [x, y]
 
-    if 0 <= x < 15 and 0 <= y < 15 and grid[x][y] == 0:
+    if 0 <= x < BOARD_ROW and 0 <= y < BOARD_COLUMN and grid[x][y] == 0:
         grid[x][y] = player
+    if check_draw(grid):
+        return grid, position, player, 0
     if check_win(grid, position, player):
         return grid, position, player, player
     return grid, position, player, -1
@@ -28,23 +32,17 @@ def waiting_for_connections(serversocket):
     while len(connection) < 2:
         conn, addr = serversocket.accept()
         connection.append(conn)
-        print(conn)
-        print(connection)
     return connection
 
 def recieve_information(connection):
-    print("waiting...")
-    print(connection)
     player_1_info, player_2_info = None, None
     connection_0_header_data = recv_n_bytes(connection[0], 4)
-    print(f"connection[0] header: {connection_0_header_data}")
     if len(connection_0_header_data) == 4:
         connection_0_len = struct.unpack('<L', connection_0_header_data)[0]
         player_1_info = json.loads(recv_n_bytes(connection[0], connection_0_len).decode("utf-8"))
         
 
     connection_1_header_data = recv_n_bytes(connection[1], 4)
-    print(f"connection[1] header: {connection_1_header_data}")
     if len(connection_1_header_data) == 4:
         connection_1_len = struct.unpack('<L', connection_1_header_data)[0]
         player_2_info = json.loads(recv_n_bytes(connection[1], connection_1_len).decode("utf-8"))
@@ -60,6 +58,9 @@ def recv_n_bytes(socket, n):
         data += chunk
     return data
 
+def check_draw(grid):
+    return all([grid[i][j] != 0 for i in range(BOARD_ROW) for j in range(BOARD_COLUMN)])
+
 def check_win(grid, position, player):
     target = 1 if player else 2
     if grid[position[0]][position[1]] != target:
@@ -69,7 +70,7 @@ def check_win(grid, position, player):
         continue_chess = 0
         for i in range(2):
             p = position[:]
-            while 0 <= p[0] < 15 and 0 <= p[1] < 15:
+            while 0 <= p[0] < BOARD_ROW and 0 <= p[1] < BOARD_COLUMN:
                 if grid[p[0]][p[1]] == target:
                     continue_chess += 1
                 else:
@@ -87,7 +88,7 @@ def main(ip, port):
         serversocket.bind((ip, port))
         print(f"[+] Server start at {ip}:{port}")
         serversocket.listen(2)
-        grid = [[0 for _ in range(15)] for _ in range(15)]
+        grid = [[0 for _ in range(BOARD_COLUMN)] for _ in range(BOARD_ROW)]
         position = [-1,-1]
         player = 2
         winner = -1
@@ -101,11 +102,7 @@ def main(ip, port):
             print(f"[*] Send to connection[1]: {header+data}")
 
             player1, player2 = recieve_information(connection)
-            print(f"[*] Receive From Player1: {player1}")
-            print(f"[*] Receive From Player1: {player2}")
-
-            if player1 is not None and player2 is not None:
-
+            if player1 is not None or player2 is not None:
                 grid, position, player, winner = process_positions((grid, position, player, winner), player1, player2)
     except KeyboardInterrupt:
         serversocket.close()

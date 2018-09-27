@@ -7,6 +7,8 @@ from random import choice
 
 from socketclientthread import SocketClientThread, ClientCommand, ClientReply
 
+BOARD_ROW = 5
+BOARD_COLUMN = 5
 
 def creat_client():
     clientsocket = SocketClientThread()
@@ -15,11 +17,8 @@ def creat_client():
     return clientsocket
 
 def send_data(clientsocket, data):
-    print(f"[*] send data:{data}")
     clientsocket.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
-    print(list(clientsocket.cmd_q.queue)[0])
     reply = clientsocket.reply_q.get(True)
-    print(reply.type_, reply.data)
     
 def on_client_reply_timer(clientsocket, server_addr, player):
     while True:
@@ -27,12 +26,10 @@ def on_client_reply_timer(clientsocket, server_addr, player):
         clientsocket.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
         try:
             reply = clientsocket.reply_q.get(block=True)
-            print(reply.type_, reply.data)
             if reply.data == "Socket closed prematurely":
                 close_connection(clientsocket)
                 break
             if reply.type_ == ClientReply.SUCCESS and reply.data is not None:
-                print("[+] ready for next package")
                 if next_pacakge(clientsocket, reply.data, player) == 0:
                     clientsocket.cmd_q.put(ClientCommand(ClientCommand.CLOSE))
                     break
@@ -49,11 +46,10 @@ def parse(data):
     return data["grid"], data["player"], data["winner"]
 
 def random_move(grid):
-    return choice([[i,j] for i in range(15) for j in range(15) if grid[i][j] == 0])
+    return choice([[i,j] for i in range(BOARD_ROW) for j in range(BOARD_COLUMN) if grid[i][j] == 0])
 
 def next_pacakge(clientsocket, data, player):
     grid, last_player, winner = parse(data)
-    print(f"Parsed Data: \nGrid:{grid}\nLast_Player:{last_player}\nWinner:{winner}")
     if winner > 0:
         print(f"[+] Game Over Winner is player No.:{last_player}")
         return 0
@@ -62,18 +58,11 @@ def next_pacakge(clientsocket, data, player):
         return 0
     else:
         if last_player != player:
-            print(f"[*] Now is for Player No.{player}")
             x, y = random_move(grid)
-            print(f"[*] Next Random Move {x}/{y}")
             grid[x][y] = player
             data = {"grid":grid, "x":x, "y":y, "player":player}
-            print(f"[*] Data to be send to server: {data}")
             send_data(clientsocket, json.dumps(data).encode("utf-8"))
-        else:
-            print(f"[*] NOT MY TURN FROM Player No.{player}")
-            data = {"grid":[], "x":-1, "y":-1, "player":player}
-            print(f"[*] Data to be send to server: {data}")
-            send_data(clientsocket, json.dumps(data).encode("utf-8"))
+        
     return 1
 
 def parse_options():
