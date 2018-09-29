@@ -5,6 +5,7 @@ import argparse
 import re
 import sys
 import json
+from functools import wraps
 
 #I like this singleton, need it later
 def singleton(cls):
