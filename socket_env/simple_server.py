@@ -2,7 +2,7 @@
 import socket, json, random
 
 serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-serversocket.bind(("0.0.0.0", 50003))
+serversocket.bind(("localhost", 50003))
 serversocket.listen(2)
 connection = []
 BOARD_ROW = 5
@@ -12,14 +12,44 @@ def process_positions(arr, player1, player2):
     if arr["player"] != player1["player"]:
         grid = player1["grid"]
         player = player1["player"]
+        x = player1["x"]
+        y = player1["y"]
     else:
         grid = player2["grid"]
         player = player2["player"]
-    gameover = grid_full(grid)
+        x = player2["x"]
+        y = player2["y"]
+    if check_win(grid, [x, y], player):
+        gameover = 1
+    elif check_draw(grid):
+        gameover = 0
+    else:
+        gameover = -1
     return {"grid":grid, "player":player, "gameover":gameover}
 
-def grid_full(grid):
+def check_draw(grid):
     return all([grid[i][j] != 0 for i in range(BOARD_ROW) for j in range(BOARD_COLUMN)])
+
+def check_win(grid, position, player):
+    target = player
+    if grid[position[0]][position[1]] != target:
+        return False
+    directions = [([0, 1], [0, -1]), ([1, 0], [-1, 0]), ([-1, 1], [1, -1]), ([1, 1], [-1, -1])]
+    for direction in directions:
+        continue_chess = 0
+        for i in range(2):
+            p = position[:]
+            while 0 <= p[0] < BOARD_ROW and 0 <= p[1] < BOARD_COLUMN:
+                if grid[p[0]][p[1]] == target:
+                    continue_chess += 1
+                else:
+                    break
+                p[0] += direction[i][0]
+                p[1] += direction[i][1]
+
+        if continue_chess >= 6:
+            return True
+    return False
 
 def waiting_for_connections():
     while len(connection)<2:
@@ -43,16 +73,17 @@ def recieve_information():
 
     return player_1_info, player_2_info
 
+
 if __name__ == "__main__":
     try:
         grid = [[0 for _ in range(BOARD_COLUMN)] for _ in range(BOARD_ROW)]
         player = 2
-        gameover = False
+        gameover = -1
         arr = {"grid":grid, "player":player, "gameover":gameover}
         while True:
             waiting_for_connections()
+
             data_arr = json.dumps(arr).encode("utf-8")
-            print(data_arr)
             connection[0].send(data_arr)
             connection[1].send(data_arr)
 
