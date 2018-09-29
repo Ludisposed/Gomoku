@@ -36,7 +36,6 @@ def next_move(grid, player):
             pass
     return grid, x, y
 
-# TODO: Fix First Move 
 def display(player):
     
     while True:
@@ -66,4 +65,4 @@ def display(player):
             break
        
 if __name__ == "__main__":
-    display(sys.argv[1])
+    display(int(sys.argv[1]))
