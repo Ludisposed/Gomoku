@@ -170,8 +170,8 @@ python server.py -i '0.0.0.0' -p 9999
                                         )
     parser.add_argument('-i','--ip', type=str, default="localhost", help='server host')
     parser.add_argument('-p','--port', type=int, default=9999, help='server port')
-    parser.add_argument('-r','--row', type=int, default=5, help='board row length')
-    parser.add_argument('-c','--column', type=int, default=5, help='board column length')
+    parser.add_argument('-r','--row', type=int, default=15, help='board row length')
+    parser.add_argument('-c','--column', type=int, default=15, help='board column length')
   
     args = parser.parse_args()
 

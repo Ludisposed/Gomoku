@@ -6,17 +6,51 @@ import re
 import threading
 import queue
 
+def singleton(cls):
+    instances = {}
+    def _singleton(*args, **kwags):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwags)
+        return instances[cls]
+    return _singleton
+
+@singleton
+class GomokuClient():
+    def __init__(self):
+        self._client = None
+
+    @property
+    def client(self):
+        return self._client
+    
+    def connect(self, host, port):
+        self._client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._client.connect((host, port))
+
+    def send(self, data):
+        self._client.send(json.dumps(data).encode("utf-8"))
+    
+    def receive(self):
+        response = self._client.recv(4096)
+        return json.loads(response.decode("utf-8"))
+
+    def close(self):
+        self._client.close()
+        self._client = None
+
 class ClientCommand():
     CONNECT, SEND, RECEIVE, CLOSE = range(4)
     def __init__(self, type_, data=None):
         self.type_ = type_
         self.data = data
 
+
 class GomokuClientThread(threading.Thread):
     def __init__(self, send_q=queue.Queue(), reply_q=queue.Queue()):
         super(GomokuClientThread, self).__init__()
         self.cmd_q = send_q
         self.reply_q = reply_q
+        self.clientsocket = GomokuClient()
         self.handlers = {
             ClientCommand.CONNECT: self.connect,
             ClientCommand.CLOSE: self.close,
@@ -34,23 +68,22 @@ class GomokuClientThread(threading.Thread):
 
     def connect(self, data):
         host, port = data
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
+        self.clientsocket.connect(host, port)
         self.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
 
     def send(self, data):
         if data.get("grid"):
             data["grid"] = self.grid_matrix_2_str(data["grid"])
-        self.sock.send(json.dumps(data).encode("utf-8"))
+        self.clientsocket.send(data)
         self.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
 
     def recieve(self, data=None):
-        data = self.sock.recv(1024).decode("utf-8")
-        data = json.loads(data)
-        self.reply_q.put(data)
+        data = self.clientsocket.receive()
+        if data:
+            self.reply_q.put(data)
 
     def close(self, data=None):
-        self.sock.close()
+        self.clientsocket.close()
     
     def grid_matrix_2_str(self, grid):
         n = len(grid)
@@ -91,7 +124,7 @@ class GomokuGame():
                         print("You Win")
                     else:
                         print("You Lost")
-                client.close()
+                client_thread.cmd_q.put(ClientCommand(ClientCommand.CLOSE))
                 break
 
     def grid_str_2_matrix(self, grid):

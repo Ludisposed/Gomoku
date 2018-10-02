@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 import pygame
 from pygame.locals import *
-import json
-import queue
 import argparse
 import re
-from socketclientthread import SocketClientThread, ClientCommand, ClientReply
+from random import choice
+import time
+from simpleclient import GomokuClientThread, ClientCommand
 
-# TOOD: need test for primary thread
+# STILL BLOCKING
+
 # Define some colors
 BLACK = (0, 0, 0)
 WHITE = (245, 245, 245)
@@ -26,25 +27,76 @@ GAME_HIGHT = GAME_WIDTH + 100
 
 # when to update
 class Gomoku(object):
-    def __init__(self, player, server_addr):
+    def __init__(self, player, server_addr, board_row=15, board_column=15):
         pygame.init()
         pygame.font.init()
         pygame.time.set_timer(USEREVENT+1, 10000)# every 10 seconds
-        self.grid = [[0 for _ in range(15)] for _ in range(15)]
+        
         self._display_surf = pygame.display.set_mode(
             (GAME_WIDTH, GAME_HIGHT),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         pygame.display.set_caption('Gomoku')
 
-        self.creat_client(server_addr)
+        self.grid = None
+        self.client_thread = None
 
-        self.player = player
+        self.server_addr = server_addr
         self.last_player = -1
+        self.player = player
         self._running = True
-        self.winner = False
-        self._playing = False
+        self.winner = -1
+        self.board_row = board_row
+        self.board_column = board_column
         self.lastPosition = [-1, -1]
+
+    def on_execute(self):
+        self.client_thread = GomokuClientThread()
+        self.client_thread.start()
+        self.client_thread.cmd_q.put(ClientCommand(ClientCommand.CONNECT, self.server_addr))
+        
+        while self._running:
+            data = self.client_thread.reply_q.get(True)
+            print(data)
+            if data:
+                self.last_player = data["player"]
+                self.grid = self.grid_str_2_matrix(data["grid"])
+                self.lastPosition = [data["x"], data["y"]]
+                self.gomoku_board_init()
+                
+                if data["gameover"] == -1:
+                    if data["next_player"] != self.player:
+                        self.client_thread.cmd_q.put(ClientCommand(ClientCommand.SEND, {"wait": True}))
+                        print("waiting")
+                    else:
+                        for event in pygame.event.get():
+                            self.on_event(event)
+                        x, y = self.random_position()
+                        self.grid[x][y] = self.player
+                        data = {"grid":self.grid, "x":x, "y":y, "player":self.player}
+                        self.client_thread.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
+                        print("new move")
+                else:
+                    print("game over")
+                    self._running = False
+                    if data["gameover"] == 0:
+                        self.winner = 0
+                    else:
+                        self.winner = data["player"]
+                    self.client_thread.cmd_q.put(ClientCommand(ClientCommand.CLOSE))
+                    break
+            self.on_render()
+            time.sleep(5)
+            
+              
+        self.on_cleanup()
+
+    def random_position(self):
+        print(self.grid)
+        n = len(self.grid)
+        m = len(self.grid[0])
+        return choice([[i, j] for i in range(n) for j in range(m) if self.grid[i][j] == 0])
+
 
     def update(self, message):
         self._playing = True
@@ -57,46 +109,27 @@ class Gomoku(object):
         if self.winner >= 0:
             self._playing = False
     
-    def creat_client(self, server_addr):
-        self.clientsocket = SocketClientThread()
-        self.clientsocket.start()
-        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.CONNECT, server_addr))
-
-    def send_data(self, data):
-        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
-        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
-
-    def on_client_reply_timer(self):
-        try:
-            reply = self.clientsocket.reply_q.get(block=False)
-            if reply.type_ == ClientReply.SUCCESS and reply.data is not None:
-                data = reply.data.decode("utf-8")
-                data = json.loads(data)
-                self.update(data)
-        except queue.Empty:
-            pass
-
-    def close_connection(self):
-        self.clientsocket.cmd_q.put(ClientCommand(ClientCommand.CLOSE))
 
     def on_event(self, event):
+        print(event.type == pygame.MOUSEBUTTONUP)
         if event.type == pygame.QUIT:
             self.close_connection()
             self._running = False
 
-        if self._playing:
-            if event.type == pygame.MOUSEBUTTONUP:
-                pos = pygame.mouse.get_pos()
-                r = (pos[0] - PADDING + WIDTH // 2) // (WIDTH + MARGIN)
-                c = (pos[1] - PADDING + WIDTH // 2) // (WIDTH + MARGIN)
-                if 0 <= r < 15 and 0 <= c < 15 and self.grid[r][c] == 0:
-                    self.grid[r][c] = self.player
-                    data = {"grid":self.grid, "x":r, "y":c, "player":self.player}
-                    self.send_data(data)
-                    self._playing = False
+        if event.type == pygame.MOUSEBUTTONUP:
+            pos = pygame.mouse.get_pos()
+            r = (pos[0] - PADDING + WIDTH // 2) // (WIDTH + MARGIN)
+            c = (pos[1] - PADDING + WIDTH // 2) // (WIDTH + MARGIN)
+            print(r, c)
+            if 0 <= r < self.board_row and 0 <= c < self.board_column and self.grid[r][c] == 0:
+                self.grid[r][c] = self.player
+                data = {"grid":self.grid, "x":r, "y":c, "player":self.player}
+                self.client_thread.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
+
 
 
     def on_render(self):
+        print("rending...")
         self.render_gomoku_piece()
         self.render_last_position()
         self.render_game_info()
@@ -104,19 +137,12 @@ class Gomoku(object):
 
     def on_cleanup(self):
         pygame.quit()
-
-    def on_execute(self):
-        self.on_client_reply_timer()
-        while self._running:
-            if pygame.event.get(USEREVENT+1):
-                self.on_client_reply_timer()
-            self.gomoku_board_init()
-            for event in pygame.event.get():
-                self.on_event(event)
-            self.on_render()
             
-        self.on_cleanup()
 
+    def grid_str_2_matrix(self, grid):
+        return [list(map(int, grid[i:i+self.board_column])) for i in range(0, len(grid), self.board_column)]
+
+    
     def gomoku_board_init(self):
         self._display_surf.fill(YELLOW)
         # Draw background rect for game area
@@ -146,8 +172,6 @@ class Gomoku(object):
                             DOT), 0)
 
     def render_game_info(self):
-        
-
         color = BLACK if not self.last_player == 1 else WHITE
         center = (GAME_WIDTH // 2 - 60, BOARD + 60)
         radius = 12
@@ -167,10 +191,11 @@ class Gomoku(object):
         textRect.centerx = self._display_surf.get_rect().centerx + 20
         textRect.centery = center[1]
         self._display_surf.blit(text, textRect)
+        print("Finish render 3/3")
 
     def render_gomoku_piece(self):
-        for r in range(15):
-            for c in range(15):
+        for r in range(self.board_row):
+            for c in range(self.board_column):
                 center = ((MARGIN + WIDTH) * r + MARGIN + PADDING,
                           (MARGIN + WIDTH) * c + MARGIN + PADDING)
                 if self.grid[r][c] > 0:
@@ -179,6 +204,7 @@ class Gomoku(object):
                     pygame.draw.circle(self._display_surf, color,
                                        center,
                                        WIDTH // 2 - MARGIN, 0)
+        print("Finish render 1/3")
 
     def render_last_position(self):
         if self.lastPosition[0] > 0 and self.lastPosition[1] > 0:
@@ -187,6 +213,7 @@ class Gomoku(object):
                               (MARGIN + WIDTH) * self.lastPosition[1] + (MARGIN + WIDTH) // 2,
                               (MARGIN + WIDTH),
                               (MARGIN + WIDTH)), 1)
+        print("Finish render 2/3")
 
     def __call__(self):
         self.on_execute()
