@@ -6,8 +6,38 @@ import threading
 import argparse
 import re
 
+'''
+TODO: 
+1. focus on multithread
+2. add GUI to client game
 
+Update Process:
+1. First step, send board_row and board_column to client
+2. A server can handle lots(one-one) game, not just two player
+3. MiMT attack
+
+'''
 class GomokuServer():
+    '''
+    Package:
+        Server -> Client: 
+                          grid => grid(str, with 0 1 and 2)
+                          x => last move x position(int)
+                          y => last move y position(int) 
+                          player => Last Player(int)
+                          next_player => who's next player(int)
+                          gameover => is gameover(int), -1=No, 0=Draw, 1=Player Win
+
+        Client -> Server: (case 1: with move)
+                          grid => grid(str, with 0 1 and 2)
+                          x => last move x position(int)
+                          y => last move y position(int) 
+                          player => Last Player(int)
+
+                          (case 2: without move)
+                          wait => (always be True)
+
+    '''
     def __init__(self, host, port, board_row, board_column):
         self.board_row = board_row
         self.board_column = board_column
@@ -30,8 +60,11 @@ class GomokuServer():
         self.sock.close()
 
     def listen_2_clients(self, connection):
-        self.response = {"grid":[[0 for _ in range(self.board_column)] for _ in range(server.board_row)], 
-                         "player": 2,
+        self.response = {"grid":"0"*(self.board_row*self.board_column), 
+                         "x": -1,
+                         "y": -1,
+                         "player": -1,
+                         "next_player": 1,
                          "gameover": -1}
         while True:
             data_arr = json.dumps(self.response).encode("utf-8")
@@ -71,7 +104,7 @@ class GomokuServer():
         return player_1_info, player_2_info
 
     def process_positions(self, player1, player2):
-        if self.response["player"] != player1["player"]:
+        if not player1.get("wait"):
             grid = player1["grid"]
             player = player1["player"]
             x = player1["x"]
@@ -81,13 +114,22 @@ class GomokuServer():
             player = player2["player"]
             x = player2["x"]
             y = player2["y"]
+        grid = self.grid_str_2_matrix(grid)
         if self._check_win(grid, [x, y], player):
             gameover = 1
         elif self._check_draw(grid):
             gameover = 0
         else:
             gameover = -1
-        return {"grid":grid, "player":player, "gameover":gameover}
+        grid = self.grid_matrix_2_str(grid)
+        return {"grid":grid, "x":x, "y":y, "player":player, "next_player":3-player, "gameover":gameover}
+
+    def grid_str_2_matrix(self, grid):
+        
+        return [list(map(int, grid[i:i+self.board_column])) for i in range(0, len(grid), self.board_column)]
+
+    def grid_matrix_2_str(self, grid):
+        return "".join("".join(str(grid[i][j]) for j in range(self.board_column)) for i in range(self.board_row))
 
     def _check_draw(self, grid):
         return all([grid[i][j] != 0 for i in range(self.board_row) for j in range(self.board_column)])

@@ -19,16 +19,18 @@ class GomokuClient():
         while True:
             info = self.recieve_data()
             gameover = info["gameover"]
-            last_player = info["player"]
+            current_player = info["next_player"]
             if gameover == -1:
-                if last_player == self.player:
-                    self.sock.send(json.dumps(info).encode("utf-8"))
+                if current_player != self.player:
+                    self.sock.send(json.dumps({"wait": True}).encode("utf-8"))
                 else:
                     grid = info["grid"]
+                    grid = self.grid_str_2_matrix(grid)
                     self.print_grid(grid)
                     grid, x, y = self.next_move(grid)
                     self.print_grid(grid)
                     print("Waiting...")
+                    grid = self.grid_matrix_2_str(grid)
                     data = {"grid":grid, "x":x, "y":y, "player":self.player}
                     self.sock.send(json.dumps(data).encode("utf-8"))
             else:
@@ -64,6 +66,13 @@ class GomokuClient():
             except:
                 pass
         return grid, x, y
+
+    def grid_str_2_matrix(self, grid):
+
+        return [list(map(int, grid[i:i+self.board_column])) for i in range(0, len(grid), self.board_column)]
+
+    def grid_matrix_2_str(self, grid):
+        return "".join("".join(str(grid[i][j]) for j in range(self.board_column)) for i in range(self.board_row))
 
     def __call__(self):
         return self.display()
