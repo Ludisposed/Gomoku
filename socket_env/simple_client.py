@@ -3,51 +3,99 @@ import json
 import sys
 import argparse
 import re
+import threading
+import queue
 
+class ClientCommand():
+    CONNECT, SEND, RECEIVE, CLOSE = range(4)
+    def __init__(self, type_, data=None):
+        self.type_ = type_
+        self.data = data
 
-class GomokuClient():
-    def __init__(self, player, host="localhost", port=50003, board_row=5, board_column=5):
-        self.host = host
-        self.port = port
+class GomokuClientThread(threading.Thread):
+    def __init__(self, send_q=queue.Queue(), reply_q=queue.Queue()):
+        super(GomokuClientThread, self).__init__()
+        self.cmd_q = send_q
+        self.reply_q = reply_q
+        self.handlers = {
+            ClientCommand.CONNECT: self.connect,
+            ClientCommand.CLOSE: self.close,
+            ClientCommand.SEND: self.send,
+            ClientCommand.RECEIVE: self.recieve,
+        }
+    
+    def run(self):
+        while True:
+            try:
+                cmd = self.cmd_q.get(True, 0.1)
+                self.handlers[cmd.type_](cmd.data)
+            except queue.Empty as e:
+                continue
+
+    def connect(self, data):
+        host, port = data
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((host, port))
+        self.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
+
+    def send(self, data):
+        if data.get("grid"):
+            data["grid"] = self.grid_matrix_2_str(data["grid"])
+        self.sock.send(json.dumps(data).encode("utf-8"))
+        self.cmd_q.put(ClientCommand(ClientCommand.RECEIVE))
+
+    def recieve(self, data=None):
+        data = self.sock.recv(1024).decode("utf-8")
+        data = json.loads(data)
+        self.reply_q.put(data)
+
+    def close(self, data=None):
+        self.sock.close()
+    
+    def grid_matrix_2_str(self, grid):
+        n = len(grid)
+        m = len(grid[0])
+        return "".join("".join(str(grid[i][j]) for j in range(m)) for i in range(n))
+    
+
+class GomokuGame():
+    def __init__(self, player, board_row=5, board_column=5, host="localhost", port=50003):
         self.board_row = board_row
         self.board_column = board_column
         self.player = player
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host, port))
+        self.host = host
+        self.port = port
 
     def display(self):
+        client_thread = GomokuClientThread()
+        client_thread.start()
+        client_thread.cmd_q.put(ClientCommand(ClientCommand.CONNECT, (self.host, self.port)))
         while True:
-            info = self.recieve_data()
-            gameover = info["gameover"]
-            current_player = info["next_player"]
-            if gameover == -1:
-                if current_player != self.player:
-                    self.sock.send(json.dumps({"wait": True}).encode("utf-8"))
+            data = client_thread.reply_q.get(True)
+            grid = self.grid_str_2_matrix(data["grid"])
+            if data["gameover"] == -1:
+                if data["next_player"] != self.player:
+                    client_thread.cmd_q.put(ClientCommand(ClientCommand.SEND, {"wait": True}))
                 else:
-                    grid = info["grid"]
-                    grid = self.grid_str_2_matrix(grid)
                     self.print_grid(grid)
                     grid, x, y = self.next_move(grid)
                     self.print_grid(grid)
                     print("Waiting...")
-                    grid = self.grid_matrix_2_str(grid)
                     data = {"grid":grid, "x":x, "y":y, "player":self.player}
-                    self.sock.send(json.dumps(data).encode("utf-8"))
+                    client_thread.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
             else:
-                if gameover == 0:
+                if data["gameover"] == 0:
                     print("Draw")
                 else:
-                    if last_player == self.player:
+                    if data["player"] == self.player:
                         print("You Win")
                     else:
                         print("You Lost")
-                self.sock.close()
+                client.close()
                 break
 
-    def recieve_data(self):
-        data = self.sock.recv(1024).decode("utf-8")
-        data = json.loads(data)
-        return data
+    def grid_str_2_matrix(self, grid):
+        return [list(map(int, grid[i:i+self.board_column])) for i in range(0, len(grid), self.board_column)]
 
     def print_grid(self, grid):
         print("\n".join([" | ".join(list(map(str, grid[i]))) for i in range(self.board_row)]))
@@ -67,15 +115,9 @@ class GomokuClient():
                 pass
         return grid, x, y
 
-    def grid_str_2_matrix(self, grid):
-
-        return [list(map(int, grid[i:i+self.board_column])) for i in range(0, len(grid), self.board_column)]
-
-    def grid_matrix_2_str(self, grid):
-        return "".join("".join(str(grid[i][j]) for j in range(self.board_column)) for i in range(self.board_row))
-
     def __call__(self):
         return self.display()
+
 
 def parse_options():
     parser = argparse.ArgumentParser(usage='%(prog)s [options]',
@@ -104,5 +146,5 @@ python server.py -i '0.0.0.0' -p 9999
        
 if __name__ == "__main__":
     args = parse_options()
-    client = GomokuClient(args.player, args.ip, args.port)
-    client()
+    game = GomokuGame(args.player, host=args.ip, port=args.port)
+    game()
