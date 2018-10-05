@@ -246,3 +246,11 @@ if __name__ == "__main__":
     args = parse_options()
     game = Gomoku(args.player, (args.ip, args.port))
     game()
+
+
+for event in pygame.event.get():
+    self.on_event(event)
+x, y = self.random_position()
+self.grid[x][y] = self.player
+data = {"grid":self.grid, "x":x, "y":y, "player":self.player}
+self.client_thread.cmd_q.put(ClientCommand(ClientCommand.SEND, data))
