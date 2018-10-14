@@ -58,6 +58,10 @@ class Gomoku(object):
                     if self.grid[r][c] == 0:
                         self.lastPosition = [r, c]
                         self.grid[r][c] = 1 if self.player else 2
+                        if self.player == 1:
+                            pygame.mixer.Sound("Bb.wav").play()
+                        else:
+                            pygame.mixer.Sound("G.wav").play()
 
                         # check win
                         if self.check_win([r, c], self.player):
