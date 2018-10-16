@@ -18,111 +18,89 @@ Update Process:
 
 '''
 class GomokuServer():
-    '''
-    Package:
-        Server -> Client: 
-                          grid => grid(str, with 0 1 and 2)
-                          x => last move x position(int)
-                          y => last move y position(int) 
-                          player => Last Player(int)
-                          next_player => who's next player(int)
-                          gameover => is gameover(int), -1=No, 0=Draw, 1=Player Win
-
-        Client -> Server: (case 1: with move)
-                          grid => grid(str, with 0 1 and 2)
-                          x => last move x position(int)
-                          y => last move y position(int) 
-                          player => Last Player(int)
-
-                          (case 2: without move)
-                          wait => (always be True)
-
-    '''
-    def __init__(self, host, port, board_row, board_column):
+    def __init__(self, port, board_row, board_column):
         self.board_row = board_row
         self.board_column = board_column
-        self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((self.host, self.port))
+        self.sock.bind(("localhost", self.port))
+        self.connections = []
+        self.waiting = []
+        self.connection_map = {}
 
     def listen(self):
         self.sock.listen(2)
-        print(f"Listing {self.host}:{self.port}")
-        connection = []
+        print(f"Listing localhost:{self.port}")
         
         while True:
-            self.waiting_for_connections(connection)
-            self.listen_2_clients(connection)
+            client_socket, addr = self.sock.accept()
+            print(f"Connection from {addr[0]}:{addr[1]}")
+            self.add_connection(client_socket)
+            client_socket.settimeout(60)
 
     def close(self):
         self.sock.close()
 
-    def listen_2_clients(self, connection):
-        self.response = {"grid":"0"*(self.board_row*self.board_column), 
-                         "x": -1,
-                         "y": -1,
-                         "player": -1,
-                         "next_player": 1,
-                         "gameover": -1}
-        while True:
-            data_arr = json.dumps(self.response).encode("utf-8")
-            connection[0].send(data_arr)
-            connection[1].send(data_arr)
+    def add_connection(self, client_socket):
+        if len(self.waiting) == 0:
+            self.waiting.append(client_socket)
+        elif len(self.waiting) == 1:
+            self.waiting += [client_socket]
+            idx = len(self.connections)
+            self.connections += [{"connections":self.waiting, "grid":"0"*(self.board_row*self.board_column), "player":0}]
 
-            player1, player2 = self.recieve_information(connection)
+            for i in range(len(self.waiting)):
+                sock = self.waiting[i]
+                self.connection_map[sock] = idx
+                data = {"player":i+1, "row":self.board_row, "column":self.board_column}
+                data = json.dumps(data).encode("utf-8")
+                sock.send(data)
+                client_thread = threading.Thread(target=self.handle_client, args=(sock,))
+                client_thread.start()
+            self.waiting = []
 
-            if player1 is None:
-                self.sock.close()
-                break
+    def handle_client(self, client_socket):
+        print(f"Client: {client_socket}")
+        connection_idx = self.connection_map.get(client_socket)
+        print(connection_idx)
+        if connection_idx is not None:
+            connection = self.connections[connection_idx]
+            data = json.loads(client_socket.recv(1024).decode("utf-8"))
+            print(f"Receive from {client_socket}: {data}")
+            if connection["connections"][connection["player"]] == client_socket:
+                
+                grid, gameover = self._update_grid(connection["grid"], data, connection["player"]+1)
+                if gameover >= 0:
+                    for conn in connection["connections"]:
+                        conn.sent(json.dumps({"gameover":gameover*(1 if conn == client_socket else -1)}).encode('utf-8'))
+                    # self._remove_connections(connection["connections"])
+                else:
+                    next_player = connection["player"] ^ 1
+                    next_player_socket = connection["connections"][next_player]
+                    data["gameover"] = -2
+                    next_player_socket.send(json.dumps(data).encode('utf-8'))
+                    connection["player"] = next_player
+                    connection["grid"] = grid
 
-            self.response = self.process_positions(player1, player2)
-        
 
-    def waiting_for_connections(self, connection):
-        while len(connection)<2:
-            conn, addr = self.sock.accept()
-            conn.settimeout(60)
-            connection.append(conn)
-            print(conn)
-            print(connection)
-
-    def recieve_information(self, connection):
-        connection_0_data = connection[0].recv(1024)
-        if connection_0_data == b'':
-            print("connection 0 is GONE")
-            return None, None
-
-        connection_1_data = connection[1].recv(1024)
-        if connection_1_data == b'':
-            print("connection 1 is GONE")
-            return None, None
-        player_1_info = json.loads(connection_0_data.decode("utf-8"))
-        player_2_info = json.loads(connection_1_data.decode("utf-8"))
-
-        return player_1_info, player_2_info
-
-    def process_positions(self, player1, player2):
-        if not player1.get("wait"):
-            grid = player1["grid"]
-            player = player1["player"]
-            x = player1["x"]
-            y = player1["y"]
-        else:
-            grid = player2["grid"]
-            player = player2["player"]
-            x = player2["x"]
-            y = player2["y"]
+    def _update_grid(self, grid, move_data, player):
         grid = self.grid_str_2_matrix(grid)
+        x, y = move_data.values()
+        grid[x][y] = player
+        gameover = -1
         if self._check_win(grid, [x, y], player):
             gameover = 1
         elif self._check_draw(grid):
             gameover = 0
-        else:
-            gameover = -1
         grid = self.grid_matrix_2_str(grid)
-        return {"grid":grid, "x":x, "y":y, "player":player, "next_player":3-player, "gameover":gameover}
+        return grid, gameover
+
+    def _remove_connections(self, connections, idx):
+        for conn in connections:
+            conn.close()
+            del self.connection_map[conn]
+        del self.connections[idx]
 
     def grid_str_2_matrix(self, grid):
         
@@ -168,26 +146,16 @@ Examples:
 python server.py -i '0.0.0.0' -p 9999
 '''
                                         )
-    parser.add_argument('-i','--ip', type=str, default="localhost", help='server host')
     parser.add_argument('-p','--port', type=int, default=9999, help='server port')
-    parser.add_argument('-r','--row', type=int, default=15, help='board row length')
-    parser.add_argument('-c','--column', type=int, default=15, help='board column length')
+    parser.add_argument('-r','--row', type=int, default=5, help='board row length')
+    parser.add_argument('-c','--column', type=int, default=5, help='board column length')
   
     args = parser.parse_args()
-
-
-    ip_pattern = "((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:(?<!\.)|\.)){4}"
-    ip = re.match(ip_pattern, args.ip)
-    valid_ip = (ip and ip.group(0) == args.ip)
-
-    if not (args.ip == "localhost" or valid_ip):
-        print("[-] IPV4 host is not valid")
-        sys.exit(1)
     return args
 
 if __name__ == "__main__":
     args = parse_options()
-    server = GomokuServer(args.ip, args.port, args.row, args.column)
+    server = GomokuServer(args.port, args.row, args.column)
     try:
         server()
     except KeyboardInterrupt:
