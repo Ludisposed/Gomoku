@@ -4,7 +4,7 @@ import json
 import random
 import threading
 import argparse
-import re
+import socketserver
 
 '''
 TODO: 
@@ -135,7 +135,7 @@ class GomokuServer():
 
     def __call__(self):
         return self.listen()
-
+        
 def parse_options():
     parser = argparse.ArgumentParser(usage='%(prog)s [options]',
                                      description='Gomoku socket server @Qin',
@@ -143,7 +143,7 @@ def parse_options():
                                      epilog=
 '''
 Examples:
-python server.py -i '0.0.0.0' -p 9999
+python main.py -p 9999
 '''
                                         )
     parser.add_argument('-p','--port', type=int, default=9999, help='server port')
